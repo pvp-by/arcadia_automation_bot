@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  discord-bot:
+    container_name: "discord-bot"
+    depends_on:
+      - redis
+    build: ./bot
+    restart: on-failure
+    env_file:
+      - common.env
+    logging:
+      driver: "local"
+      options:
+        max-size: 5m
+        max-file: "5"
+
+  webhook-listener:
+    container_name: "webhook-listener"
+    depends_on:
+      - redis
+    build: ./webhook_listener
+    restart: on-failure
+    env_file:
+      - common.env
+    ports:
+      - "80:80"
+    logging:
+      driver: "local"
+      options:
+        max-size: 5m
+        max-file: "5"
+
+  redis:
+    container_name: "redis"
+    image: "redis:alpine"
+    command: redis-server /redis/redis.conf --requirepass $PWD
+    env_file:
+      - common.env
+    ports:
+     - "6379:6379"
+    volumes:
+    - /redis.conf:/redis/redis.conf
+
+

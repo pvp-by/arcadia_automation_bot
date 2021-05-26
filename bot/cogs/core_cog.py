@@ -1,0 +1,67 @@
+from discord.ext import commands, tasks
+from discord import Game
+from loguru import logger
+from datetime import datetime
+
+
+class Core(commands.Cog, name="Core"):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        logger.info("[COG] Core is ready!")
+        self.set_status.start()
+
+    @staticmethod
+    def reserved(key: str) -> bool:
+        return "-report-channel-id" in key or "-report-channel-name" in key
+
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    async def link(self, context: commands.Context, key: str, *args):
+        if self.reserved(key):
+            return
+        await context.bot.redis.delete(key)
+        await context.bot.redis.rpush(key, *args)
+        await context.send(f"Successfully set link keypair")
+
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    async def unlink(self, context: commands.Context, key: str):
+        if self.reserved(key):
+            return
+        await context.bot.redis.delete(key)
+        await context.send(f"Successfully deleted key <{key}>")
+
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    async def list_commands(self, context: commands.Context):
+        keys = await context.bot.redis.keys("*")
+        commands_list = f"\n".join([key.decode("utf-8") for key in keys])
+        await context.send(f"Linked commands:\n```{commands_list}```")
+
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    @logger.catch
+    async def assign(self, context: commands.Context, custom_game_name: str):
+        if not context.message.author.guild_permissions.administrator:
+            return
+        executor = context.bot.redis.multi_exec()
+        executor.set(f"{custom_game_name}-report-channel-id", context.channel.id)
+        executor.set(f"{custom_game_name}-report-channel-name", context.channel.name)
+        state_1, state_2 = await executor.execute()
+
+        context.bot.report_channels[custom_game_name] = context.channel
+
+        if state_1 and state_2:
+            await context.channel.send(f"Successfully set report channel of {custom_game_name} "
+                                       f"to <{context.channel.id}>{context.channel.name}")
+            return
+        await context.channel.send(f"Something went wrong! Status codes: {state_1}:{state_2}")
+
+    @tasks.loop(minutes=1, reconnect=True)
+    async def set_status(self):
+        await self.bot.change_presence(activity=Game(
+            name=f"UTC: {datetime.utcnow()}"
+        ))
