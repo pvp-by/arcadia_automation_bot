@@ -51,12 +51,12 @@ class Github(commands.Cog, name="Github"):
         if replied_message.author != self.bot.user:
             return
 
-        replied_content = replied_message.content
-        if "Opened new issue:" not in replied_content:
+        if not replied_message.embeds:
             return
-        split = replied_content.split("/")
-        issue_id = split[-1]
-        repo = split[-3]
+
+        issue_link_split = replied_message.embeds[0].author.url.split("/")
+        issue_id = issue_link_split[-1]
+        repo = issue_link_split[-3]
 
         body = message.content
         lowered = body.lower()
@@ -263,9 +263,19 @@ close: duplicate of #12
         if context.message.attachments:
             body += await process_attachments(context, context.message.attachments[0].url)
         status, details = await open_issue(context, repo, title, body)
-        pprint(details)
+
         if status:
-            await context.send(f"Opened new issue: {details['html_url']}")
+            embed = Embed(
+                description=f"Reply to this message to interact with new issue",
+                colour=colour.Colour.green(),
+                timestamp=datetime.utcnow(),
+            )
+            embed.set_author(
+                icon_url=str(context.message.author.avatar_url),
+                name=f"Opened issue #{details['number']} in {repo}",
+                url=details['html_url']
+            )
+            await context.send(embed=embed)
         else:
             await context.reply(f"GitHub error occurred:\n{details}.")
 

@@ -37,12 +37,10 @@ async def publish_localization_changes(session: ClientSession, redis, data: dict
     comment_description = f""" 
 @AnnHuangofNJUST @StariyOld 
 
-Pushed by: @{data['pusher']}
-
-Detected in diff from [`{before[:6]}`]({base_url}/commits/{before}) to [`{after[:6]}`]({base_url}/commits/{after}).
+Pushed by: @{data['pusher']}, detected in diff from [`{before[:6]}`]({base_url}/commits/{before}) to [`{after[:6]}`]({base_url}/commits/{after}).
 Total changes: `{data['file']['changes']}`, from them `{data['file']['additions']}` additions, `{data['file']['deletions']}` deletions
         
-**Compare changes of listed commits using [github diff]({data['compare']}#diff-{data['anchor']})**
+**Compare changes of using [github diff]({data['compare']}#diff-{data['anchor']})**
     """.strip()
 
     create_comment_link = f"{data['repo']['url']}/issues/{issue_number}/comments"
