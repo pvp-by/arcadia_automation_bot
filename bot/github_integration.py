@@ -166,8 +166,6 @@ async def search_issues(session: ClientSession, repo: str, query: str,
         "page": page_num
     }
 
-    logger.info(request_body["q"])
-
     resp = await session.get(
         f"{base_api_link}/search/issues", headers=base_api_headers, params=request_body
     )

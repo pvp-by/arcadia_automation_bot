@@ -1,5 +1,5 @@
 from discord.ext import commands, tasks
-from discord import Game
+from discord import Game, Embed
 from loguru import logger
 from datetime import datetime
 
@@ -12,6 +12,19 @@ class Core(commands.Cog, name="Core"):
     async def on_ready(self):
         logger.info("[COG] Core is ready!")
         self.set_status.start()
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        embed = Embed(
+            description="You have joined Arcadia Redux server!",
+            timestamp=datetime.utcnow()
+        )
+        embed.add_field(name="Need help with Patreon membership?", value="Contact **Australia Is My City#9760**")
+        embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/684952282076282882/838854388201553930/123.png")
+        embed.set_author(
+            name="Welcome!"
+        )
+        await member.send(embed=embed)
 
     @staticmethod
     def reserved(key: str) -> bool:

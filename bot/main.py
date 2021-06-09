@@ -22,7 +22,13 @@ token = os.getenv("BOT_TOKEN", None)
 
 __BOT_STATE = BotState.UNSET
 
-bot = commands.Bot(command_prefix=PREFIX)
+intents = discord.Intents.default()
+intents.bans = False
+intents.integrations = False
+intents.webhooks = False
+intents.members = True
+
+bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 bot.session = aiohttp.ClientSession()
 bot.add_cog(github_cog.Github(bot))
 bot.add_cog(core_cog.Core(bot))
