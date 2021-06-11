@@ -2,7 +2,7 @@ from pprint import pprint
 
 from discord.ext import commands
 from datetime import datetime
-from discord import colour
+from discord import colour, Member
 import asyncio
 
 # import nonsense cause of different root folders in docker and in IDE
@@ -65,6 +65,11 @@ class Github(commands.Cog, name="Github"):
 
         if lowered.startswith("assign:"):
             assignees = body[7:].strip().split(" ")
+            for i, assignee in enumerate(assignees):
+                if assignee.startswith("<"):
+                    assignees[i] = await self.bot.redis.hget(
+                        "github_mention", assignee.replace("!", ""), encoding='utf8'
+                    )
             status, _ = await assign_issue(self.bot.session, repo, issue_id, assignees)
 
         elif lowered.startswith("label:"):
@@ -136,6 +141,23 @@ class Github(commands.Cog, name="Github"):
             footer = f"Page: {page_number}"
             await message.edit(embed=update_embed(embed, new_description, title, footer))
 
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    async def add_github_name(self, context: commands.Context, user: Member, github_name: str):
+        await context.trigger_typing()
+        await context.bot.redis.hset("github_mention", user.mention, github_name)
+        await context.send(f"Successfully assigned {user.mention} to github name **{github_name}**")
+
+    @commands.command()
+    async def github_name(self, context: commands.Context, user: Member):
+        await context.trigger_typing()
+        github_name = await context.bot.redis.hget("github_mention", user.mention, encoding="utf8")
+        if github_name:
+            msg = f"Github username of {user.mention} is **{github_name}**"
+        else:
+            msg = f"No associated Github username for {user.mention} stored!"
+        await context.send(msg)
+
     @commands.command(name="issue", aliases=["i", "issues", "Issues", "I"])
     async def issue(self, context: commands.Context, *args):
         if len(args) == 0:
@@ -147,6 +169,8 @@ class Github(commands.Cog, name="Github"):
             shortcuts = "\n".join([f"{key.ljust(10)} => {value}" for key, value in preset_repos.items()])
             embed.add_field(name="Shortcuts: ", value=f"```{shortcuts}```", inline=False)
             usage = """
+    `$add_github_name @mention github_username` - assign github name to mentioned user
+    `$github_name @mention` - get assigned github name of mentioned user
     `$issue [repo name] "[title]" "[description]"` - open shortcut
     `$issue [command]` - bot guidance
     `$issue open war "Test" "Test"` - example of full command for issue opening
@@ -371,7 +395,8 @@ close: duplicate of #12
                 f"{issue_state} {link} {item['title']}"
             )
 
-        description.append(f"\n[`How to compose queries`](https://docs.github.com/en/github/searching-for-information-on-github/searching-on-github/searching-issues-and-pull-requests#search-only-issues-or-pull-requests)")
+        description.append(
+            f"\n[`How to compose queries`](https://docs.github.com/en/github/searching-for-information-on-github/searching-on-github/searching-issues-and-pull-requests#search-only-issues-or-pull-requests)")
 
         embed = Embed(
             title=f"Total search results: {results} {'listing 10' if results > 10 else ''}",

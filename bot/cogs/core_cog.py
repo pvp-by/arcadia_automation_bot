@@ -1,7 +1,8 @@
 from discord.ext import commands, tasks
-from discord import Game, Embed
+from discord import Game, Embed, Member
 from loguru import logger
 from datetime import datetime
+from croniter import croniter
 
 
 class Core(commands.Cog, name="Core"):
@@ -29,6 +30,13 @@ class Core(commands.Cog, name="Core"):
     @staticmethod
     def reserved(key: str) -> bool:
         return "-report-channel-id" in key or "-report-channel-name" in key
+
+    @commands.command()
+    async def season_reset(self, context: commands.Context):
+        date = datetime.utcnow()
+        cron = croniter("0 0 1 */3 *", date)
+        schedule = "\n".join(str(cron.get_next(datetime)) for _ in range(4))
+        await context.send(f"Season Reset schedule:\n{schedule}")
 
     @commands.command()
     @commands.has_permissions(manage_messages=True)

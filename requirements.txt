@@ -36,3 +36,4 @@ win32-setctime==1.0.3
 yarl==1.6.3
 Pillow-SIMD==7.0.0.post3
 python-dotenv~=0.17.1
+croniter~=1.0.13
