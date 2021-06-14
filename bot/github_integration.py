@@ -147,6 +147,16 @@ async def get_issues_list(session: ClientSession, repo: str, state: str, count: 
     return "\n".join(description_list)
 
 
+async def get_issue_by_number(session: ClientSession, repo: str, issue_id: _Numeric) -> _ApiResponse:
+    resp = await session.get(f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}", headers=base_api_headers)
+    return resp.status <= 400, await resp.json()
+
+
+async def get_pull_request_by_number(session: ClientSession, repo: str, pull_id: _Numeric) -> _ApiResponse:
+    resp = await session.get(f"{base_api_link}/repos/arcadia-redux/{repo}/pulls/{pull_id}", headers=base_api_headers)
+    return resp.status <= 400, await resp.json()
+
+
 async def comment_issue(session: ClientSession, repo: str, issue_id: _Numeric, body: str) -> Tuple[bool, Union[dict, str]]:
     resp = await session.post(
         f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}/comments",

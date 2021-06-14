@@ -1,17 +1,17 @@
-from pprint import pprint
-
 from discord.ext import commands
-from datetime import datetime
-from discord import colour, Member
+from discord import colour, Member, Message
 import asyncio
+import re
 
 # import nonsense cause of different root folders in docker and in IDE
 try:
     from ..github_integration import *
     from cog_util import *
+    from embeds import *
 except ValueError:
     from github_integration import *
     from cogs.cog_util import *
+    from cogs.embeds import *
 
 
 class Github(commands.Cog, name="Github"):
@@ -27,7 +27,12 @@ class Github(commands.Cog, name="Github"):
             [["search", "s"], self._search_issues],
             [["assign", "as"], self._assign_to_issue],
         ]
+        self.private_repos = ["reVolt", "custom_hero_clash", "chclash_webserver", "war_masters"]
+
         self.repos_stringified_list = ""
+        self.url_regex = re.compile(
+            "(https?:\/\/(.+?\.)?github\.com\/arcadia-redux(\/[A-Za-z0-9\-\._~:\/\?#\[\]@!$&'\(\)\*\+,;\=]*)?)"
+        )
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -38,6 +43,8 @@ class Github(commands.Cog, name="Github"):
     async def on_message(self, message):
         if message.author.bot:
             return
+
+        await self.process_github_links(message)
 
         reference = message.reference
         if not reference:
@@ -112,6 +119,27 @@ class Github(commands.Cog, name="Github"):
                 comment_wrap_contextless(body, message)
             )
         await message.add_reaction("✅" if status else "🚫")
+
+    async def process_github_links(self, message: Message):
+        content = message.content
+        links = re.findall(self.url_regex, content)
+        links = [link[0] for link in links]
+        for link in links:
+            repo_name, link_type, object_id = link.split("/")[-3:]
+            if repo_name not in self.private_repos:
+                continue
+            if link_type == "issues":
+                status, data = await get_issue_by_number(self.bot.session, repo_name, object_id)
+                if not status:
+                    continue
+                embed = get_issue_embed(data, object_id, repo_name, link)
+                await message.channel.send(embed=embed)
+            elif link_type == "pull":
+                status, data = await get_pull_request_by_number(self.bot.session, repo_name, object_id)
+                if not status:
+                    continue
+                embed = get_pull_request_embed(data, object_id, repo_name, link)
+                await message.channel.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
