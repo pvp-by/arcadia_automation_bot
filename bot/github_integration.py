@@ -157,6 +157,19 @@ async def get_pull_request_by_number(session: ClientSession, repo: str, pull_id:
     return resp.status <= 400, await resp.json()
 
 
+async def get_commit_by_sha(session: ClientSession, repo: str, sha: str) -> _ApiResponse:
+    resp = await session.get(f"{base_api_link}/repos/arcadia-redux/{repo}/commits/{sha}", headers=base_api_headers)
+    return resp.status <= 400, await resp.json()
+
+
+async def get_commits_diff(session: ClientSession, repo: str, base: str, head: str) -> _ApiResponse:
+    resp = await session.get(
+        f"{base_api_link}/repos/arcadia-redux/{repo}/compare/{base}...{head}",
+        headers=base_api_headers
+    )
+    return resp.status <= 400, await resp.json()
+
+
 async def comment_issue(session: ClientSession, repo: str, issue_id: _Numeric, body: str) -> Tuple[bool, Union[dict, str]]:
     resp = await session.post(
         f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}/comments",

@@ -22,7 +22,7 @@ def get_issue_embed(data: dict, object_id: str, repo_name: str, link: str) -> Em
         icon_url=data["user"]["avatar_url"],
     )
     opened_at_date = datetime.strptime(data['created_at'], "%Y-%m-%dT%H:%M:%SZ")
-    embed.set_footer(text=f"{data['comments']} Comment{'s' if data['comments'] != 1 else ''} "
+    embed.set_footer(text=f"{data['comments']} comment{'s' if data['comments'] != 1 else ''} "
                           f"| Opened at {opened_at_date.strftime('%c')}")
     return embed
 
@@ -43,15 +43,16 @@ def get_pull_request_embed(data: dict, object_id: str, repo_name: str, link: str
         merge_state = data['mergeable_state']
         if merge_state in ["blocked", "behind"]:
             color = Colour.red()
-        elif merge_state == "dirty":
-            color = Colour.dark_orange()
+    elif data['mergeable_state'] == "dirty":
+        merge_state = "has conflicts"
+        color = Colour.dark_orange()
     description = [
         f"**Labels**: {labels}" if labels else "",
         f"**Assignees**: {assignees}" if assignees else "",
         f"**Reviewers**: {reviewers}" if reviewers else "",
         f"**Changes**: {data['commits']} commit{'s' if data['commits'] != 1 else ''}, "
         f"`+{data['additions']}` : `-{data['deletions']}` in {data['changed_files']} files",
-        f"**Merge state:** `{merge_state}`",
+        f"**Merge state**: `{merge_state}`",
         f'\n{data["body"]}' if len(data["body"]) < 400 else "",
     ]
     embed = Embed(
@@ -65,6 +66,6 @@ def get_pull_request_embed(data: dict, object_id: str, repo_name: str, link: str
         icon_url=data['user']['avatar_url']
     )
     opened_at_date = datetime.strptime(data['created_at'], "%Y-%m-%dT%H:%M:%SZ")
-    embed.set_footer(text=f"{data['comments']} Comment{'s' if data['comments'] != 1 else ''} "
+    embed.set_footer(text=f"{data['comments']} comment{'s' if data['comments'] != 1 else ''} "
                           f"| Opened at {opened_at_date.strftime('%c')}")
     return embed

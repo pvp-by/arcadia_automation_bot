@@ -125,6 +125,8 @@ class Github(commands.Cog, name="Github"):
         links = re.findall(self.url_regex, content)
         links = [link[0] for link in links]
         for link in links:
+            if link.endswith("/"):
+                link = link[:-1]
             repo_name, link_type, object_id = link.split("/")[-3:]
             if repo_name not in self.private_repos:
                 continue
