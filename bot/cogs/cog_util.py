@@ -42,8 +42,7 @@ async def process_attachments(context, attachment_url: str):
 async def process_attachments_contextless(message, session, attachment_url: str, delete_original: bool = True) -> str:
     logger.info(f"[Image processing] initial image url: {attachment_url}")
     if delete_original:
-        prev_text = f"From {message.author.mention}\n" \
-                    f"```{message.content}```"
+        prev_text = f"From {message.author.mention}\n```{message.content}```"
     else:
         prev_text = ""
 

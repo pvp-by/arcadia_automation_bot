@@ -1,15 +1,30 @@
 from discord import Embed
 from datetime import datetime
 from discord.colour import Colour
+import re
+
+
+def get_image_link(body: str) -> (str, str):
+    result = re.search(
+        r"(!\[(.*?)\]\((.*?)\))",
+        body
+    )
+    if result:
+        link_structure = result.group(0)
+        extracted_link = link_structure.replace("![image](", "")[:-1]
+        cleaned_body = body.replace(link_structure + "\n", "").replace(link_structure + "\r\n", "")
+        return extracted_link, cleaned_body
+    return "", body
 
 
 def get_issue_embed(data: dict, object_id: str, repo_name: str, link: str) -> Embed:
     labels = ", ".join([f"`{label['name']}`" for label in data['labels']])
     assignees = ", ".join([f"`{assignee['login']}`" for assignee in data['assignees']])
+    image_link, data["body"] = get_image_link(data["body"])
     description = [
         f"**Labels**: {labels}" if labels else "",
         f"**Assignees**: {assignees}" if assignees else "",
-        f'\n{data["body"]}' if len(data["body"]) < 400 else "",
+        f'\n{data["body"]}' if len(data["body"]) < 800 else "",
     ]
     embed = Embed(
         title=data['title'],
@@ -19,11 +34,13 @@ def get_issue_embed(data: dict, object_id: str, repo_name: str, link: str) -> Em
     embed.set_author(
         name=f"Linked issue #{object_id} in {repo_name} by {data['user']['login']}",
         url=link,
-        icon_url=data["user"]["avatar_url"],
+        icon_url=data["user"]["avatar_url"]
     )
     opened_at_date = datetime.strptime(data['created_at'], "%Y-%m-%dT%H:%M:%SZ")
     embed.set_footer(text=f"{data['comments']} comment{'s' if data['comments'] != 1 else ''} "
                           f"| Opened at {opened_at_date.strftime('%c')}")
+    if image_link:
+        embed.set_image(url=image_link)
     return embed
 
 
