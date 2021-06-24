@@ -170,6 +170,20 @@ async def get_commits_diff(session: ClientSession, repo: str, base: str, head: s
     return resp.status <= 400, await resp.json()
 
 
+async def get_repo_labels(session: ClientSession, repo: str) -> _ApiResponse:
+    resp = await session.get(
+        f"{base_api_link}/repos/arcadia-redux/{repo}/labels", headers=base_api_headers
+    )
+    return resp.status <= 400, await resp.json()
+
+
+async def get_arcadia_team_members(session: ClientSession) -> _ApiResponse:
+    resp = await session.get(
+        f"{base_api_link}/organizations/46830822/team/4574724/members", headers=base_api_headers
+    )
+    return resp.status <= 400, await resp.json()
+
+
 async def comment_issue(session: ClientSession, repo: str, issue_id: _Numeric, body: str) -> Tuple[bool, Union[dict, str]]:
     resp = await session.post(
         f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}/comments",

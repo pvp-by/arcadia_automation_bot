@@ -6,12 +6,14 @@ import re
 # import nonsense cause of different root folders in docker and in IDE
 try:
     from ..github_integration import *
+    from ..views.github_views import *
     from cog_util import *
     from embeds import *
 except ValueError:
     from github_integration import *
     from cogs.cog_util import *
     from cogs.embeds import *
+    from views.github_views import *
 
 
 class Github(commands.Cog, name="Github"):
@@ -135,13 +137,15 @@ class Github(commands.Cog, name="Github"):
                 if not status:
                     continue
                 embed = get_issue_embed(data, object_id, repo_name, link)
-                await message.channel.send(embed=embed)
+                view = IssueControls(self.bot.session, repo_name, object_id)
+                await message.channel.send(embed=embed, view=view)
             elif link_type == "pull":
                 status, data = await get_pull_request_by_number(self.bot.session, repo_name, object_id)
                 if not status:
                     continue
                 embed = get_pull_request_embed(data, object_id, repo_name, link)
-                await message.channel.send(embed=embed)
+                view = IssueControls(self.bot.session, repo_name, object_id)
+                await message.channel.send(embed=embed, view=view)
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
@@ -172,14 +176,28 @@ class Github(commands.Cog, name="Github"):
             await message.edit(embed=update_embed(embed, new_description, title, footer))
 
     @commands.command()
+    async def check_input_waiting(self, context: Context):
+        selected = await get_selectable_argument(
+            context, "What's your chosen thing?", ["yes", "no", "maybe", "perhaps", "1", "2", "3"]
+        )
+        await context.send(f"You selected: {selected}")
+
+    @commands.command()
+    async def check_dropdown(self, context: Context):
+        selected = await get_dropdown_argument(
+            context, "Drop that down!", ["yes", "no", "maybe", "perhaps", "1", "2", "3"]
+        )
+        await context.send(f"You selected: {selected}")
+
+    @commands.command()
     @commands.has_permissions(manage_messages=True)
-    async def add_github_name(self, context: commands.Context, user: Member, github_name: str):
+    async def add_github_name(self, context: Context, user: Member, github_name: str):
         await context.trigger_typing()
         await context.bot.redis.hset("github_mention", user.mention, github_name)
         await context.send(f"Successfully assigned {user.mention} to github name **{github_name}**")
 
     @commands.command()
-    async def github_name(self, context: commands.Context, user: Member):
+    async def github_name(self, context: Context, user: Member):
         await context.trigger_typing()
         github_name = await context.bot.redis.hget("github_mention", user.mention, encoding="utf8")
         if github_name:
@@ -189,7 +207,7 @@ class Github(commands.Cog, name="Github"):
         await context.send(msg)
 
     @commands.command(name="issue", aliases=["i", "issues", "Issues", "I"])
-    async def issue(self, context: commands.Context, *args):
+    async def issue(self, context: Context, *args):
         if len(args) == 0:
             embed = Embed(
                 description="Shortcuts are case-insensitive",
@@ -254,9 +272,9 @@ close: duplicate of #12
             if args_len > 0:
                 repo = args[0]
             else:
-                repo = await get_argument(
+                repo = await get_selectable_argument(
                     context,
-                    f"In which repo? Here's possible ones:\n{self.repos_stringified_list}"
+                    f"Select repo:", preset_repos.keys()
                 )
             if repo.lower() in preset_repos:
                 repo = preset_repos[repo.lower()]
@@ -325,11 +343,13 @@ close: duplicate of #12
                 timestamp=datetime.utcnow(),
             )
             embed.set_author(
-                icon_url=str(context.message.author.avatar_url),
+                icon_url=str(context.message.author.avatar),
                 name=f"Opened issue #{details['number']} in {repo}",
                 url=details['html_url']
             )
-            await context.send(embed=embed)
+            control_view = IssueControls(context.bot.session, repo, details['number'])
+            msg = await context.send(embed=embed, view=control_view)
+            control_view.assign_message(msg)
         else:
             await context.reply(f"GitHub error occurred:\n{details}.")
 

@@ -24,7 +24,7 @@ def get_issue_embed(data: dict, object_id: str, repo_name: str, link: str) -> Em
     description = [
         f"**Labels**: {labels}" if labels else "",
         f"**Assignees**: {assignees}" if assignees else "",
-        f'\n{data["body"]}' if len(data["body"]) < 800 else "",
+        f'\n{data["body"]}' if len(data["body"]) < 1200 else "",
     ]
     embed = Embed(
         title=data['title'],
@@ -70,7 +70,7 @@ def get_pull_request_embed(data: dict, object_id: str, repo_name: str, link: str
         f"**Changes**: {data['commits']} commit{'s' if data['commits'] != 1 else ''}, "
         f"`+{data['additions']}` : `-{data['deletions']}` in {data['changed_files']} files",
         f"**Merge state**: `{merge_state}`",
-        f'\n{data["body"]}' if len(data["body"]) < 400 else "",
+        f'\n{data["body"]}' if len(data["body"]) < 1200 else "",
     ]
     embed = Embed(
         title=data['title'],

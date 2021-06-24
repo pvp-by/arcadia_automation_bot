@@ -1,5 +1,5 @@
 from asyncio import TimeoutError
-from typing import Final
+from typing import Final, List, Set
 from discord import Embed
 from discord.ext.commands import Context
 from loguru import logger
@@ -7,6 +7,12 @@ from PIL import Image
 from discord import File
 from uuid import uuid1
 import io
+
+try:
+    from ..views.utility_views import DropdownView, SelectionView, MultiSelectionView
+except ValueError:
+    from views.utility_views import DropdownView, SelectionView, MultiSelectionView
+
 
 PAGE_CONTROLS: Final = {"⏮": -1, "⏭": 1}
 
@@ -25,6 +31,40 @@ async def get_argument(context: Context, text: str) -> str:
         await msg.delete()
         logger.warning(f"get_argument timed out")
     return argument
+
+
+async def __get_view_argument(view_cls, context: Context, text: str, selection: List[str]) -> str:
+    selection_view = view_cls(selection)
+    msg = await context.reply(text, view=selection_view)
+    argument = None
+    try:
+        await selection_view.wait()
+        argument = selection_view.result()
+    except TimeoutError:
+        await msg.delete()
+        logger.warning("get_selectable_argument timed out")
+    return argument
+
+
+async def get_selectable_argument(context: Context, text: str, selection: List[str]) -> str:
+    return await __get_view_argument(SelectionView, context, text, selection)
+
+
+async def get_dropdown_argument(context: Context, text: str, selection: List[str]) -> str:
+    return await __get_view_argument(DropdownView, context, text, selection)
+
+
+async def get_multi_selection_standalone(channel, text: str, selection: List[str]) -> List[str]:
+    selection_view = MultiSelectionView(selection)
+    msg = await channel.send(text, view=selection_view)
+    arguments = []
+    try:
+        await selection_view.wait()
+        arguments = selection_view.result()
+    except TimeoutError:
+        await msg.delete()
+        logger.warning("get_multi_selection_standalone timed out")
+    return arguments
 
 
 def update_embed(embed, desc: str, author: str, footer: str = ""):
