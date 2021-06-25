@@ -1,7 +1,7 @@
 import os
 from google.cloud.translate import TranslationServiceAsyncClient
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.getcwd() + f"/{os.getenv('GOOGLE_PROJECT_CREDS_FILENAME', '')}"
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.getcwd() + f"/bot/{os.getenv('GOOGLE_PROJECT_CREDS_FILENAME', '')}"
 
 client = TranslationServiceAsyncClient()
 parent = f"projects/{os.getenv('GOOGLE_PROJECT_API', '')}/locations/global"

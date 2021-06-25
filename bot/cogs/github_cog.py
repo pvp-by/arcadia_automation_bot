@@ -3,17 +3,9 @@ from discord import colour, Member, Message
 import asyncio
 import re
 
-# import nonsense cause of different root folders in docker and in IDE
-try:
-    from ..github_integration import *
-    from ..views.github_views import *
-    from cog_util import *
-    from embeds import *
-except ValueError:
-    from github_integration import *
-    from cogs.cog_util import *
-    from cogs.embeds import *
-    from views.github_views import *
+from bot.views.github_views import *
+from bot.cogs.cog_util import *
+from bot.cogs.embeds import *
 
 
 class Github(commands.Cog, name="Github"):
@@ -138,14 +130,16 @@ class Github(commands.Cog, name="Github"):
                     continue
                 embed = get_issue_embed(data, object_id, repo_name, link)
                 view = IssueControls(self.bot.session, repo_name, object_id)
-                await message.channel.send(embed=embed, view=view)
+                msg = await message.channel.send(embed=embed, view=view)
+                view.assign_message(msg)
             elif link_type == "pull":
                 status, data = await get_pull_request_by_number(self.bot.session, repo_name, object_id)
                 if not status:
                     continue
                 embed = get_pull_request_embed(data, object_id, repo_name, link)
-                view = IssueControls(self.bot.session, repo_name, object_id)
-                await message.channel.send(embed=embed, view=view)
+                view = PullRequestControls(self.bot.session, repo_name, object_id, data)
+                msg = await message.channel.send(embed=embed, view=view)
+                view.assign_message(msg)
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):

@@ -4,6 +4,21 @@ from discord.colour import Colour
 import re
 
 
+def get_pr_merge_state(data: dict) -> (str, bool):
+    if data['draft']:
+        return "Draft", False
+    elif data['merged']:
+        return "Merged", False
+    elif data["mergeable"]:
+        merge_state = data['mergeable_state']
+        if merge_state in ["blocked", "behind"]:
+            return "Blocked", False
+        return "Merge", True
+    elif data['mergeable_state'] == "dirty":
+        return "Has conflicts", False
+    return "Merge state unknown", False
+
+
 def get_image_link(body: str) -> (str, str):
     result = re.search(
         r"(!\[(.*?)\]\((.*?)\))",

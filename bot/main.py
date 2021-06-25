@@ -4,7 +4,7 @@ import json
 import os
 from typing import Final
 
-from __load_env import LOCALS_IMPORTED  # True if imported local .env file
+from bot.__load_env import LOCALS_IMPORTED  # True if imported local .env file
 
 import aiohttp
 import aioredis
@@ -13,9 +13,9 @@ from aioredis.pubsub import Receiver
 from discord.ext import commands
 from loguru import logger
 
-from cogs import github_cog, core_cog
-from enums import BotState
-from translator import translate
+from bot.cogs import github_cog, core_cog
+from bot.enums import BotState
+from bot.translator import translate
 
 PREFIX: Final = "$" if not LOCALS_IMPORTED else "%"
 token = os.getenv("BOT_TOKEN", None)

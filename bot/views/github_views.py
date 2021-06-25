@@ -1,21 +1,19 @@
-from discord import Game, Embed, ButtonStyle, Interaction
-from discord.ui import View, Button, button, select
-
-try:
-    from ..github_integration import *
-    from ..cogs.cog_util import get_multi_selection_standalone, MultiSelectionView
-except ValueError:
-    from github_integration import *
-    from cogs.cog_util import get_multi_selection_standalone, MultiSelectionView
+from discord import ButtonStyle, Interaction
+from discord.ui import Button, button
 
 
-class IssueControls(View):
-    message = None
+from ..github_integration import *
+from ..cogs.cog_util import MultiSelectionView
+from ..cogs.embeds import *
 
-    def __init__(self, session, repo: str, issue_id: int):
+from .base_view import TimedView, BaseView
+
+
+class IssueControls(TimedView):
+    def __init__(self, session, repo: str, github_id: int):
         self.session = session
         self.repo = repo
-        self.issue_id = issue_id
+        self.github_id = github_id
         super().__init__()
 
     @button(label="Add labels", style=ButtonStyle.green)
@@ -27,11 +25,12 @@ class IssueControls(View):
         selection_view = MultiSelectionView(repo_labels[:24])
 
         async def finish_callback(selection: List[str]):
-            await add_labels(self.session, self.repo, self.issue_id, selection)
+            await add_labels(self.session, self.repo, self.github_id, selection)
 
         selection_view.on_finish(finish_callback)
 
-        await interaction.channel.send(f"{interaction.user.mention}, select labels:", view=selection_view)
+        msg = await interaction.channel.send(f"{interaction.user.mention}, select labels:", view=selection_view)
+        selection_view.assign_message(msg)
 
     @button(label="Assign", style=ButtonStyle.blurple)
     async def assign_action(self, _button: Button, interaction: Interaction):
@@ -42,19 +41,26 @@ class IssueControls(View):
         selection_view = MultiSelectionView(members[:24])
 
         async def finish_callback(selection: List[str]):
-            await assign_issue(self.session, self.repo, self.issue_id, selection)
+            await assign_issue(self.session, self.repo, self.github_id, selection)
 
         selection_view.on_finish(finish_callback)
 
-        await interaction.channel.send(f"{interaction.user.mention}, select users:", view=selection_view)
+        msg = await interaction.channel.send(f"{interaction.user.mention}, select users:", view=selection_view)
+        selection_view.assign_message(msg)
 
-    @button(label="Close", style=ButtonStyle.red)
+    @button(label="Close issue", style=ButtonStyle.red, row=1)
     async def close_issue_action(self, _button: Button, interaction: Interaction):
-        await close_issue(self.session, self.repo, self.issue_id)
+        await close_issue(self.session, self.repo, self.github_id)
 
-    def assign_message(self, message):
-        self.message = message
+    @button(emoji="❎", style=ButtonStyle.danger)
+    async def remove_embed(self, _button: Button, interaction: Interaction):
+        await interaction.message.delete()
+        self.assigned_message = None
 
-    async def on_timeout(self) -> None:
-        if self.message:
-            self.message.edit(content=self.message.content, embeds=self.message.embeds, view=None)
+
+class PullRequestControls(IssueControls):
+    def __init__(self, session, repo: str, pr_id: int, pr_data: dict):
+        super().__init__(session, repo, pr_id)
+        button_text, mergeable = get_pr_merge_state(pr_data)
+        self.add_item(Button(label=button_text, style=ButtonStyle.blurple, disabled=not mergeable, row=1))
+

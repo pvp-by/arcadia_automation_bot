@@ -3,6 +3,8 @@ from discord.ui import View, Button, Select
 from discord.components import SelectOption
 from typing import List
 
+from .base_view import BaseView
+
 
 class DropdownSelect(Select):
     def __init__(self, options: List[str]):
@@ -42,7 +44,7 @@ class SelectionButton(Button):
         await interaction.message.delete()
 
 
-class SelectionView(View):
+class SelectionView(BaseView):
     selected_item = None
 
     def __init__(self, options: List[str]):
@@ -90,7 +92,7 @@ class MultiSelectionButton(Button):
         )
 
 
-class MultiSelectionView(View):
+class MultiSelectionView(BaseView):
     selected_items = None
     finish_callback = None
 

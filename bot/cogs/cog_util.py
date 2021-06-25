@@ -8,10 +8,7 @@ from discord import File
 from uuid import uuid1
 import io
 
-try:
-    from ..views.utility_views import DropdownView, SelectionView, MultiSelectionView
-except ValueError:
-    from views.utility_views import DropdownView, SelectionView, MultiSelectionView
+from ..views.utility_views import DropdownView, SelectionView, MultiSelectionView
 
 
 PAGE_CONTROLS: Final = {"⏮": -1, "⏭": 1}

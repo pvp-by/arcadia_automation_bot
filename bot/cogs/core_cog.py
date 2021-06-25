@@ -1,5 +1,5 @@
 from discord.ext import commands, tasks
-from discord import Game, Embed, Member
+from discord import Game, Embed
 from loguru import logger
 from datetime import datetime
 from croniter import croniter

@@ -5,7 +5,9 @@ services:
     container_name: "discord-bot"
     depends_on:
       - redis
-    build: ./bot
+    build:
+      context: ./
+      dockerfile: ./bot/Dockerfile
     restart: on-failure
     env_file:
       - common.env
