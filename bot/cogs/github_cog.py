@@ -98,7 +98,7 @@ class Github(commands.Cog, name="Github"):
         elif lowered.startswith("close:"):
             reason = body[7:].strip()
             status, _ = await comment_issue(self.bot.session, repo, issue_id, reason)
-            status, _ = await close_issue(self.bot.session, repo, issue_id)
+            status, _ = await set_issue_state(self.bot.session, repo, issue_id)
 
         else:
             if message.attachments:
@@ -129,7 +129,7 @@ class Github(commands.Cog, name="Github"):
                 if not status:
                     continue
                 embed = get_issue_embed(data, object_id, repo_name, link)
-                view = IssueControls(self.bot.session, repo_name, object_id)
+                view = IssueControls(self.bot.session, repo_name, object_id, data)
                 msg = await message.channel.send(embed=embed, view=view)
                 view.assign_message(msg)
             elif link_type == "pull":
@@ -308,7 +308,7 @@ close: duplicate of #12
     @staticmethod
     async def _close_issue(context: Context, repo: str, args: List[str], args_len: int) -> None:
         issue_id = args[1] if args_len > 1 else await get_argument(context, "Waiting for issue id:")
-        status, detail = await close_issue(context.bot.session, repo, issue_id)
+        status, detail = await set_issue_state(context.bot.session, repo, issue_id)
         if status:
             await context.send(f"Successfully closed issue **#{issue_id}** of **{repo}**")
         else:
@@ -341,7 +341,7 @@ close: duplicate of #12
                 name=f"Opened issue #{details['number']} in {repo}",
                 url=details['html_url']
             )
-            control_view = IssueControls(context.bot.session, repo, details['number'])
+            control_view = IssueControls(context.bot.session, repo, details['number'], details)
             msg = await context.send(embed=embed, view=control_view)
             control_view.assign_message(msg)
         else:

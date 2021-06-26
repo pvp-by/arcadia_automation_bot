@@ -70,9 +70,10 @@ async def open_issue(context: Context, repo: str, title: str, body: Optional[str
     return resp.status < 400, await resp.json()
 
 
-async def close_issue(session: ClientSession, repo: str, issue_id: _Numeric) -> _ApiResponse:
+async def set_issue_state(session: ClientSession, repo: str, issue_id: _Numeric,
+                          state: Optional[str] = "closed") -> _ApiResponse:
     issue_body = {
-        "state": "closed"
+        "state": state
     }
     resp = await session.patch(
         f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}", json=issue_body, headers=base_api_headers,
@@ -184,7 +185,8 @@ async def get_arcadia_team_members(session: ClientSession) -> _ApiResponse:
     return resp.status <= 400, await resp.json()
 
 
-async def comment_issue(session: ClientSession, repo: str, issue_id: _Numeric, body: str) -> Tuple[bool, Union[dict, str]]:
+async def comment_issue(session: ClientSession, repo: str, issue_id: _Numeric, body: str) -> Tuple[
+    bool, Union[dict, str]]:
     resp = await session.post(
         f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}/comments",
         json={"body": body},
@@ -207,4 +209,3 @@ async def search_issues(session: ClientSession, repo: str, query: str,
         f"{base_api_link}/search/issues", headers=base_api_headers, params=request_body
     )
     return resp.status < 400, await resp.json()
-

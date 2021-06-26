@@ -1,7 +1,7 @@
 from discord import ButtonStyle, Interaction
 from discord.ui import View, Button, Select
 from discord.components import SelectOption
-from typing import List
+from typing import List, Optional
 
 from .base_view import BaseView
 
@@ -96,11 +96,13 @@ class MultiSelectionView(BaseView):
     selected_items = None
     finish_callback = None
 
-    def __init__(self, options: List[str]):
+    def __init__(self, options: List[str], selected_options: Optional[List[str]] = None):
         super().__init__()
-        self.selected_items = []
+        self.selected_items = selected_options if selected_options else []
+
         for option in options:
-            self.add_item(MultiSelectionButton(option, style=ButtonStyle.primary))
+            button_style = ButtonStyle.danger if option in self.selected_items else ButtonStyle.primary
+            self.add_item(MultiSelectionButton(option, style=button_style))
         self.apply_button = MultiSelectionButton(
             "Apply", style=ButtonStyle.success, finishing_button=True, row=4
         )
