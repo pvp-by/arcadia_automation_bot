@@ -141,10 +141,10 @@ async def send_suggestion(message):
 
     if custom_game == "CustomHeroClash" and steam_id:
         embed.add_field(
-            name=f"Reward",
-            value=" | ".join(
-                f"[{i}<:fortune:831077783446749194>](https://chc-2.dota2unofficial.com/admin/management"
-                f"/add_fortune?steam_id={steam_id}&fortune_amount={i})" for i in
+            name=f"🌟 Reward 🌟",
+            value="\t|\t".join(
+                f"[{i}<:fortune:831077783446749194>](https://chc-2.dota2unofficial.com/api/lua/mail/feedback"
+                f"?steam_id={steam_id}&fortune_value={i})" for i in
                 [5, 10, 25, 50, 100]),
             inline=False
         )
