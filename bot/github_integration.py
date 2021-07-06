@@ -34,7 +34,7 @@ excluded_global_repos = {
 }
 
 _Numeric = Union[str, int]
-_ApiResponse = Tuple[bool, dict]
+_ApiResponse = Tuple[bool, Union[dict, list]]
 
 
 async def github_init(bot) -> str:
@@ -105,7 +105,6 @@ async def assign_issue(session: ClientSession, repo: str, issue_id: _Numeric, as
     issue_body = {
         "assignees": assignees,
     }
-    logger.info(f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}/assignees")
     resp = await session.post(
         f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}/assignees",
         json=issue_body,
@@ -170,7 +169,42 @@ async def get_commits_diff(session: ClientSession, repo: str, base: str, head: s
     return resp.status <= 400, await resp.json()
 
 
-async def comment_issue(session: ClientSession, repo: str, issue_id: _Numeric, body: str) -> Tuple[bool, Union[dict, str]]:
+async def get_repo_labels(session: ClientSession, repo: str) -> _ApiResponse:
+    resp = await session.get(
+        f"{base_api_link}/repos/arcadia-redux/{repo}/labels", headers=base_api_headers
+    )
+    return resp.status <= 400, await resp.json()
+
+
+async def get_arcadia_team_members(session: ClientSession) -> _ApiResponse:
+    resp = await session.get(
+        f"{base_api_link}/organizations/46830822/team/4574724/members", headers=base_api_headers
+    )
+    return resp.status <= 400, await resp.json()
+
+
+async def get_repo_single_label(session: ClientSession, repo: str, label_name: str) -> _ApiResponse:
+    resp = await session.get(
+        f"{base_api_link}/repos/arcadia-redux/{repo}/labels/{label_name}", headers=base_api_headers
+    )
+    return resp.status <= 400, await resp.json()
+
+
+async def create_repo_label(session: ClientSession, repo: str, label_name: str, color: Optional[str] = None,
+                            description: Optional[str] = None) -> _ApiResponse:
+    label_body = {
+        "name": label_name,
+        "color": color,
+        "description": description,
+    }
+    resp = await session.post(
+        f"{base_api_link}/repos/arcadia-redux/{repo}/labels", json=label_body, headers=base_api_headers
+    )
+    return resp.status <= 400, await resp.json()
+
+
+async def comment_issue(session: ClientSession, repo: str, issue_id: _Numeric,
+                        body: str) -> Tuple[bool, Union[dict, str]]:
     resp = await session.post(
         f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}/comments",
         json={"body": body},
@@ -193,4 +227,3 @@ async def search_issues(session: ClientSession, repo: str, query: str,
         f"{base_api_link}/search/issues", headers=base_api_headers, params=request_body
     )
     return resp.status < 400, await resp.json()
-

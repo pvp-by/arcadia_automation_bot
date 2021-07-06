@@ -1,4 +1,4 @@
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import colour, Member, Message
 import asyncio
 import re
@@ -12,6 +12,9 @@ except ValueError:
     from github_integration import *
     from cogs.cog_util import *
     from cogs.embeds import *
+
+
+_WarningLabelName: Final[str] = "[Auto] Cleanup warned"
 
 
 class Github(commands.Cog, name="Github"):
@@ -38,6 +41,7 @@ class Github(commands.Cog, name="Github"):
     async def on_ready(self):
         logger.info("[COG] Github is ready!")
         self.repos_stringified_list = await github_init(self.bot)
+        self.scan_old_issues.start()
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -436,3 +440,67 @@ close: duplicate of #12
         )
         embed.set_author(name=f"Search in {repo}", url=f"https://github.com/arcadia-redux/{repo}")
         await context.send(embed=embed)
+
+    @commands.command()
+    async def test_scan(self, context: Context):
+        await self._search_old_issues_in_repo_with_label("custom_hero_clash_issues", '"needs confirmation"')
+
+    async def _search_old_issues_in_repo_with_label(self, repo_name: str, label_name: str):
+        logger.info(f"[Scan] Scanning old issues in {repo_name} / {label_name}")
+        status, data = await search_issues(self.bot.session, repo_name, f"is:open label:{label_name}")
+        if not status:
+            logger.warning(f"[Scan] Issue search failed: {data}")
+            return
+        run_time = datetime.utcnow()
+
+        for issue in data["items"]:
+            await asyncio.sleep(1)
+            issue_number = issue["number"]
+
+            present_labels = [label["name"] for label in issue["labels"]]
+            has_warning_label = _WarningLabelName in present_labels
+
+            last_action_date = issue.get("updated_at", issue["created_at"])
+            updated_at = datetime.strptime(last_action_date, "%Y-%m-%dT%H:%M:%SZ")
+            date_difference = run_time - updated_at
+            if date_difference.days < 7:
+                continue
+
+            if not has_warning_label:
+                logger.info(f"[Scan] Outdated issue {issue_number}, adding label")
+
+                status, _data = await add_labels(
+                    self.bot.session, repo_name, issue_number, [_WarningLabelName, *present_labels]
+                )
+                if not status:
+                    logger.warning(f"[Scan] Error when adding labels to issue {issue_number}, {_data}")
+
+                status, _data = await comment_issue(
+                    self.bot.session, repo_name, issue_number,
+                    f"## Warning  \nThis issue was inactive for **{date_difference.days}** days "
+                    f"with label {label_name}.  "
+                    f"\nIt will be **closed** automatically after **7** days if this issue stays inactive."
+                )
+                if not status:
+                    logger.warning(f"[Scan] Error when adding labels to issue {issue_number}, {_data}")
+            else:
+                status, _data = await close_issue(self.bot.session, repo_name, issue_number)
+                if not status:
+                    logger.warning(f"[Scan] Failed to close issue {issue_number} in scan: {_data}")
+
+    @tasks.loop(hours=4, reconnect=True)
+    async def scan_old_issues(self):
+        logger.info("[Scan] Started")
+        for _, repo_name in preset_repos.items():
+            label_exists, _ = await get_repo_single_label(self.bot.session, repo_name, _WarningLabelName)
+
+            if not label_exists:
+                await create_repo_label(
+                    self.bot.session, repo_name, "[Auto] Cleanup warned", "FF4000",
+                    "This issue will be closed soon for inactivity and missing replication"
+                )
+            # github search query doesn't support logical OR for labels, therefore have to iterate over all of them
+            for label_name in ['"unknown cause"', '"needs confirmation"', f'"{_WarningLabelName}"']:
+                await self._search_old_issues_in_repo_with_label(repo_name, label_name)
+                await asyncio.sleep(10)  # solid sleep to ensure we aren't exceeding rate limits
+        logger.info("[Scan] Finished")
