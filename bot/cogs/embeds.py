@@ -20,10 +20,12 @@ def get_image_link(body: str) -> (str, str):
 def get_issue_embed(data: dict, object_id: str, repo_name: str, link: str) -> Embed:
     labels = ", ".join([f"`{label['name']}`" for label in data['labels']])
     assignees = ", ".join([f"`{assignee['login']}`" for assignee in data['assignees']])
+    milestone = data["milestone"].get("title", None)
     image_link, data["body"] = get_image_link(data["body"])
     description = [
         f"**Labels**: {labels}" if labels else "",
         f"**Assignees**: {assignees}" if assignees else "",
+        f"**Milestone**: `{milestone}`" if milestone else "",
         f'\n{data["body"]}' if len(data["body"]) < 800 else "",
     ]
     embed = Embed(
@@ -48,6 +50,7 @@ def get_pull_request_embed(data: dict, object_id: str, repo_name: str, link: str
     labels = ", ".join([f"`{label['name']}`" for label in data['labels']])
     assignees = ", ".join([f"`{assignee['login']}`" for assignee in data['assignees']])
     reviewers = ", ".join([f"`{reviewer['login']}`" for reviewer in data["requested_reviewers"]])
+    milestone = data["milestone"].get("title", None)
     merge_state = ""
     color = Colour.green()
     if data['draft']:
@@ -67,6 +70,7 @@ def get_pull_request_embed(data: dict, object_id: str, repo_name: str, link: str
         f"**Labels**: {labels}" if labels else "",
         f"**Assignees**: {assignees}" if assignees else "",
         f"**Reviewers**: {reviewers}" if reviewers else "",
+        f"**Milestone**: `{milestone}`" if milestone else "",
         f"**Changes**: {data['commits']} commit{'s' if data['commits'] != 1 else ''}, "
         f"`+{data['additions']}` : `-{data['deletions']}` in {data['changed_files']} files",
         f"**Merge state**: `{merge_state}`",

@@ -32,6 +32,13 @@ class Github(commands.Cog, name="Github"):
         ]
         self.private_repos = ["reVolt", "custom_hero_clash", "chclash_webserver", "war_masters"]
 
+        self.reply_processors = {
+            "assign": self._reply_assign,
+            "close": self._reply_close,
+            "label": self._reply_label,
+            "milestone": self._reply_milestone,
+        }
+
         self.repos_stringified_list = ""
         self.url_regex = re.compile(
             "(https?:\/\/(.+?\.)?github\.com\/arcadia-redux(\/[A-Za-z0-9\-\._~:\/\?#\[\]@!$&'\(\)\*\+,;\=]*)?)"
@@ -70,46 +77,13 @@ class Github(commands.Cog, name="Github"):
         repo = issue_link_split[-3]
 
         body = message.content
-        lowered = body.lower()
+        message_split = body.split(":")
+        reply_command = message_split[0]
+        args: List[str] = message_split[1].strip().split(" ") if len(message_split) > 1 else []
+        callback = self.reply_processors.get(reply_command.lower(), None)
 
-        status = False
-
-        if lowered.startswith("assign:"):
-            assignees = body[7:].strip().split(" ")
-            for i, assignee in enumerate(assignees):
-                if assignee.startswith("<"):
-                    assignees[i] = await self.bot.redis.hget(
-                        "github_mention", assignee.replace("!", ""), encoding='utf8'
-                    )
-            status, _ = await assign_issue(self.bot.session, repo, issue_id, assignees)
-
-        elif lowered.startswith("label:"):
-            labels_base = body[6:].strip().split(" ")
-            labels_final = []
-            _reading_complex_label = False
-            _complex_label = ""
-            for m_label in labels_base:
-                if m_label.startswith('"'):
-                    _complex_label = m_label[1:]
-                    _reading_complex_label = True
-                    continue
-                if m_label.endswith('"'):
-                    _complex_label += f" {m_label[:-1]}"
-                    _reading_complex_label = False
-                    labels_final.append(_complex_label)
-                    _complex_label = ""
-                    continue
-                if _reading_complex_label:
-                    _complex_label += m_label
-                else:
-                    labels_final.append(m_label)
-            status, _ = await add_labels(self.bot.session, repo, issue_id, labels_final)
-
-        elif lowered.startswith("close:"):
-            reason = body[7:].strip()
-            status, _ = await comment_issue(self.bot.session, repo, issue_id, reason)
-            status, _ = await close_issue(self.bot.session, repo, issue_id)
-
+        if callback:
+            status = await callback(repo, issue_id, args)
         else:
             if message.attachments:
                 body += await process_attachments_contextless(
@@ -123,6 +97,47 @@ class Github(commands.Cog, name="Github"):
                 comment_wrap_contextless(body, message)
             )
         await message.add_reaction("✅" if status else "🚫")
+
+    async def _reply_assign(self, repo: str, issue_id: str, assignees: List[str]) -> bool:
+        for i, assignee in enumerate(assignees):
+            if assignee.startswith("<"):
+                assignees[i] = await self.bot.redis.hget(
+                    "github_mention", assignee.replace("!", ""), encoding='utf8'
+                )
+        status, _ = await assign_issue(self.bot.session, repo, issue_id, assignees)
+        return status
+
+    async def _reply_close(self, repo: str, issue_id: str, reason: List[str]) -> bool:
+        status, _ = await comment_issue(self.bot.session, repo, issue_id, " ".join(reason))
+        status, _ = await close_issue(self.bot.session, repo, issue_id)
+        return status
+
+    async def _reply_label(self, repo: str, issue_id: str, labels_base: List[str]) -> bool:
+        labels_final = []
+        _reading_complex_label = False
+        _complex_label = ""
+        for m_label in labels_base:
+            if m_label.startswith('"'):
+                _complex_label = m_label[1:]
+                _reading_complex_label = True
+                continue
+            if m_label.endswith('"'):
+                _complex_label += f" {m_label[:-1]}"
+                _reading_complex_label = False
+                labels_final.append(_complex_label)
+                _complex_label = ""
+                continue
+            if _reading_complex_label:
+                _complex_label += m_label
+            else:
+                labels_final.append(m_label)
+        status, _ = await add_labels(self.bot.session, repo, issue_id, labels_final)
+        return status
+
+    async def _reply_milestone(self, repo: str, issue_id: str, milestones: List[str]) -> bool:
+        logger.info(f"{milestones=}")
+        status, _ = await set_issue_milestone(self.bot.session, repo, issue_id, " ".join(milestones).replace('"', ''))
+        return status
 
     async def process_github_links(self, message: Message):
         content = message.content
@@ -231,6 +246,7 @@ class Github(commands.Cog, name="Github"):
 label: bug "help wanted" enhancement "under review"
 assign: darklordabc SanctusAnimus ZLOY5
 close: duplicate of #12
+milestone: new round progress ui  // case insensitive
 ```
             """
             embed.add_field(name="Replying", value=reply_description, inline=False)
@@ -443,11 +459,11 @@ close: duplicate of #12
 
     @commands.command()
     async def test_scan(self, context: Context):
-        await self._search_old_issues_in_repo_with_label("custom_hero_clash_issues", '"needs confirmation"')
+        await self._search_old_issues_in_repo_with_label("custom_hero_clash_issues", '"unknown cause"')
 
     async def _search_old_issues_in_repo_with_label(self, repo_name: str, label_name: str):
         logger.info(f"[Scan] Scanning old issues in {repo_name} / {label_name}")
-        status, data = await search_issues(self.bot.session, repo_name, f"is:open label:{label_name}")
+        status, data = await search_issues(self.bot.session, repo_name, f"is:open label:{label_name}", per_page=50)
         if not status:
             logger.warning(f"[Scan] Issue search failed: {data}")
             return

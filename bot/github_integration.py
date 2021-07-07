@@ -203,6 +203,34 @@ async def create_repo_label(session: ClientSession, repo: str, label_name: str, 
     return resp.status <= 400, await resp.json()
 
 
+async def set_issue_milestone(session: ClientSession, repo: str, issue_id: _Numeric, milestone: str) -> _ApiResponse:
+    status, repo_milestones = await get_repo_milestones(session, repo)
+    if not status:
+        return status, repo_milestones
+    milestone_dict = next(
+        (item for item in repo_milestones if item["title"].lower().strip() == milestone.lower().strip()), None
+    )
+    if not milestone_dict:
+        return False, {"error": f"No milestone with name `{milestone}`"}
+    milestone_number = milestone_dict.get("number", None)
+    if not milestone_number:
+        return False, {"error": f"No milestone with name `{milestone}`"}
+    issue_body = {
+        "milestone": milestone_number
+    }
+    resp = await session.patch(
+        f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}", json=issue_body, headers=base_api_headers,
+    )
+    return resp.status < 400, await resp.json()
+
+
+async def get_repo_milestones(session: ClientSession, repo: str) -> _ApiResponse:
+    resp = await session.get(
+        f"{base_api_link}/repos/arcadia-redux/{repo}/milestones", headers=base_api_headers
+    )
+    return resp.status <= 400, await resp.json()
+
+
 async def comment_issue(session: ClientSession, repo: str, issue_id: _Numeric,
                         body: str) -> Tuple[bool, Union[dict, str]]:
     resp = await session.post(
@@ -216,10 +244,10 @@ async def comment_issue(session: ClientSession, repo: str, issue_id: _Numeric,
 
 
 async def search_issues(session: ClientSession, repo: str, query: str,
-                        page_num: Optional[_Numeric] = 1) -> _ApiResponse:
+                        page_num: Optional[_Numeric] = 1, per_page: Optional[_Numeric] = 10) -> _ApiResponse:
     request_body = {
         "q": f"repo:arcadia-redux/{repo} {query}",
-        "per_page": 10,
+        "per_page": per_page,
         "page": page_num
     }
 
