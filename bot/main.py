@@ -4,7 +4,7 @@ import json
 import os
 from typing import Final
 
-from __load_env import LOCALS_IMPORTED  # True if imported local .env file
+from .__load_env import LOCALS_IMPORTED  # True if imported local .env file
 
 import aiohttp
 import aioredis
@@ -13,9 +13,9 @@ from aioredis.pubsub import Receiver
 from discord.ext import commands
 from loguru import logger
 
-from cogs import github_cog, core_cog
-from enums import BotState
-from translator import translate
+from .cogs import github_cog, core_cog
+from .enums import BotState
+from .translator import translate
 
 PREFIX: Final = "$" if not LOCALS_IMPORTED else "%"
 token = os.getenv("BOT_TOKEN", None)
@@ -65,6 +65,7 @@ async def on_ready():
     url = os.getenv("REDIS_URl")
     pwd = os.getenv("PWD")
     bot.redis = await aioredis.create_redis_pool(url, password=pwd)
+    bot.running_local = LOCALS_IMPORTED
 
     logger.add("exec.log", rotation="1 day", retention="1 week", enqueue=True)
     logger.add("error.log", rotation="1 day", retention="1 week", enqueue=True, level="ERROR")

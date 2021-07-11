@@ -5,6 +5,7 @@ from aiohttp import ClientSession
 
 from discord.ext.commands import Context
 from loguru import logger
+from .enums import ApiRequestKind
 
 login = getenv("GITHUB_LOGIN")
 password = getenv("GITHUB_KEY")
@@ -59,58 +60,53 @@ def comment_wrap_contextless(body: str, message) -> str:
            f"Follow the conversation [here]({message.jump_url})"
 
 
+async def github_api_request(session: ClientSession, request_kind: ApiRequestKind, request_path: str,
+                             body: Optional[dict] = None) -> _ApiResponse:
+    completed_request_path = base_api_link + request_path
+    response = await getattr(session, str(request_kind))(completed_request_path, json=body, headers=base_api_headers)
+    return response.status < 400, await response.json()
+
+
 async def open_issue(context: Context, repo: str, title: str, body: Optional[str] = "") -> _ApiResponse:
-    issue_body = {
-        "title": title,
-        "body": body_wrap(body, context),
-    }
-    resp = await context.bot.session.post(
-        f"{base_api_link}/repos/arcadia-redux/{repo}/issues", json=issue_body, headers=base_api_headers
+    return await github_api_request(
+        context.bot.session, ApiRequestKind.POST, f"/repos/arcadia-redux/{repo}/issues", {
+            "title": title,
+            "body": body_wrap(body, context),
+        }
     )
-    return resp.status < 400, await resp.json()
 
 
 async def close_issue(session: ClientSession, repo: str, issue_id: _Numeric) -> _ApiResponse:
-    issue_body = {
-        "state": "closed"
-    }
-    resp = await session.patch(
-        f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}", json=issue_body, headers=base_api_headers,
+    return await github_api_request(
+        session, ApiRequestKind.PATCH, f"/repos/arcadia-redux/{repo}/issues/{issue_id}", {
+            "state": "closed"
+        }
     )
-    return resp.status < 400, await resp.json()
 
 
 async def update_issue(context: Context, repo: str, title: str, body: str, issue_id: _Numeric) -> _ApiResponse:
-    issue_body = {
-        "title": title,
-        "body": body_wrap(body, context),
-    }
-    resp = await context.bot.session.patch(
-        f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}", json=issue_body, headers=base_api_headers,
+    return await github_api_request(
+        context.bot.session, ApiRequestKind.PATCH, f"/repos/arcadia-redux/{repo}/issues/{issue_id}", {
+            "title": title,
+            "body": body_wrap(body, context),
+        }
     )
-    return resp.status < 400, await resp.json()
 
 
 async def add_labels(session: ClientSession, repo: str, issue_id: _Numeric, labels: List[str]):
-    issue_body = {
-        "labels": labels
-    }
-    resp = await session.patch(
-        f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}", json=issue_body, headers=base_api_headers,
+    return await github_api_request(
+        session, ApiRequestKind.PATCH, f"/repos/arcadia-redux/{repo}/issues/{issue_id}", {
+            "labels": labels
+        }
     )
-    return resp.status < 400, await resp.json()
 
 
 async def assign_issue(session: ClientSession, repo: str, issue_id: _Numeric, assignees: List[str]) -> _ApiResponse:
-    issue_body = {
-        "assignees": assignees,
-    }
-    resp = await session.post(
-        f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}/assignees",
-        json=issue_body,
-        headers=base_api_headers
+    return await github_api_request(
+        session, ApiRequestKind.POST, f"/repos/arcadia-redux/{repo}/issues/{issue_id}/assignees", {
+            "assignees": assignees,
+        }
     )
-    return resp.status < 400, await resp.json()
 
 
 async def get_repos(bot) -> str:
@@ -147,60 +143,56 @@ async def get_issues_list(session: ClientSession, repo: str, state: str, count: 
 
 
 async def get_issue_by_number(session: ClientSession, repo: str, issue_id: _Numeric) -> _ApiResponse:
-    resp = await session.get(f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}", headers=base_api_headers)
-    return resp.status <= 400, await resp.json()
+    return await github_api_request(
+        session, ApiRequestKind.GET, f"/repos/arcadia-redux/{repo}/issues/{issue_id}"
+    )
 
 
 async def get_pull_request_by_number(session: ClientSession, repo: str, pull_id: _Numeric) -> _ApiResponse:
-    resp = await session.get(f"{base_api_link}/repos/arcadia-redux/{repo}/pulls/{pull_id}", headers=base_api_headers)
-    return resp.status <= 400, await resp.json()
+    return await github_api_request(
+        session, ApiRequestKind.GET, f"/repos/arcadia-redux/{repo}/pulls/{pull_id}"
+    )
 
 
 async def get_commit_by_sha(session: ClientSession, repo: str, sha: str) -> _ApiResponse:
-    resp = await session.get(f"{base_api_link}/repos/arcadia-redux/{repo}/commits/{sha}", headers=base_api_headers)
-    return resp.status <= 400, await resp.json()
+    return await github_api_request(
+        session, ApiRequestKind.GET, f"/repos/arcadia-redux/{repo}/commits/{sha}"
+    )
 
 
 async def get_commits_diff(session: ClientSession, repo: str, base: str, head: str) -> _ApiResponse:
-    resp = await session.get(
-        f"{base_api_link}/repos/arcadia-redux/{repo}/compare/{base}...{head}",
-        headers=base_api_headers
+    return await github_api_request(
+        session, ApiRequestKind.GET, f"/repos/arcadia-redux/{repo}/compare/{base}...{head}"
     )
-    return resp.status <= 400, await resp.json()
 
 
 async def get_repo_labels(session: ClientSession, repo: str) -> _ApiResponse:
-    resp = await session.get(
-        f"{base_api_link}/repos/arcadia-redux/{repo}/labels", headers=base_api_headers
+    return await github_api_request(
+        session, ApiRequestKind.GET, f"/repos/arcadia-redux/{repo}/labels"
     )
-    return resp.status <= 400, await resp.json()
 
 
 async def get_arcadia_team_members(session: ClientSession) -> _ApiResponse:
-    resp = await session.get(
-        f"{base_api_link}/organizations/46830822/team/4574724/members", headers=base_api_headers
+    return await github_api_request(
+        session, ApiRequestKind.GET, f"/organizations/46830822/team/4574724/members"
     )
-    return resp.status <= 400, await resp.json()
 
 
 async def get_repo_single_label(session: ClientSession, repo: str, label_name: str) -> _ApiResponse:
-    resp = await session.get(
-        f"{base_api_link}/repos/arcadia-redux/{repo}/labels/{label_name}", headers=base_api_headers
+    return await github_api_request(
+        session, ApiRequestKind.GET, f"/repos/arcadia-redux/{repo}/labels/{label_name}"
     )
-    return resp.status <= 400, await resp.json()
 
 
 async def create_repo_label(session: ClientSession, repo: str, label_name: str, color: Optional[str] = None,
                             description: Optional[str] = None) -> _ApiResponse:
-    label_body = {
-        "name": label_name,
-        "color": color,
-        "description": description,
-    }
-    resp = await session.post(
-        f"{base_api_link}/repos/arcadia-redux/{repo}/labels", json=label_body, headers=base_api_headers
+    return await github_api_request(
+        session, ApiRequestKind.POST, f"/repos/arcadia-redux/{repo}/labels", {
+            "name": label_name,
+            "color": color,
+            "description": description,
+        }
     )
-    return resp.status <= 400, await resp.json()
 
 
 async def set_issue_milestone(session: ClientSession, repo: str, issue_id: _Numeric, milestone: str) -> _ApiResponse:
@@ -225,22 +217,17 @@ async def set_issue_milestone(session: ClientSession, repo: str, issue_id: _Nume
 
 
 async def get_repo_milestones(session: ClientSession, repo: str) -> _ApiResponse:
-    resp = await session.get(
-        f"{base_api_link}/repos/arcadia-redux/{repo}/milestones", headers=base_api_headers
+    return await github_api_request(
+        session, ApiRequestKind.GET, f"/repos/arcadia-redux/{repo}/milestones"
     )
-    return resp.status <= 400, await resp.json()
 
 
-async def comment_issue(session: ClientSession, repo: str, issue_id: _Numeric,
-                        body: str) -> Tuple[bool, Union[dict, str]]:
-    resp = await session.post(
-        f"{base_api_link}/repos/arcadia-redux/{repo}/issues/{issue_id}/comments",
-        json={"body": body},
-        headers=base_api_headers
+async def comment_issue(session: ClientSession, repo: str, issue_id: _Numeric, body: str) -> _ApiResponse:
+    return await github_api_request(
+        session, ApiRequestKind.POST, f"/repos/arcadia-redux/{repo}/issues/{issue_id}/comments", {
+            "body": body
+        }
     )
-    if resp.status >= 400:
-        return False, await resp.json()
-    return True, (await resp.json())["html_url"]
 
 
 async def search_issues(session: ClientSession, repo: str, query: str,

@@ -1,18 +1,10 @@
 from discord.ext import commands, tasks
 from discord import colour, Member, Message
 import asyncio
-import re
 
-# import nonsense cause of different root folders in docker and in IDE
-try:
-    from ..github_integration import *
-    from cog_util import *
-    from embeds import *
-except ValueError:
-    from github_integration import *
-    from cogs.cog_util import *
-    from cogs.embeds import *
-
+from ..github_integration import *
+from .cog_util import *
+from .embeds import *
 
 _WarningLabelName: Final[str] = "[Auto] Cleanup warned"
 
@@ -48,7 +40,11 @@ class Github(commands.Cog, name="Github"):
     async def on_ready(self):
         logger.info("[COG] Github is ready!")
         self.repos_stringified_list = await github_init(self.bot)
-        self.scan_old_issues.start()
+
+        if not self.bot.running_local:
+            self.scan_old_issues.start()
+        else:
+            logger.info(f"[Scan] disabled as running on local machine")
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -153,13 +149,13 @@ class Github(commands.Cog, name="Github"):
                 status, data = await get_issue_by_number(self.bot.session, repo_name, object_id)
                 if not status:
                     continue
-                embed = get_issue_embed(data, object_id, repo_name, link)
+                embed = await get_issue_embed(self.bot.session, data, object_id, repo_name, link)
                 await message.channel.send(embed=embed)
             elif link_type == "pull":
                 status, data = await get_pull_request_by_number(self.bot.session, repo_name, object_id)
                 if not status:
                     continue
-                embed = get_pull_request_embed(data, object_id, repo_name, link)
+                embed = await get_pull_request_embed(self.bot.session, data, object_id, repo_name, link)
                 await message.channel.send(embed=embed)
 
     @commands.Cog.listener()
@@ -392,26 +388,26 @@ milestone: new round progress ui  // case insensitive
                 await message.delete()
                 return
             attachment = result.attachments[0]
-        status, link = await comment_issue(
+        status, comment_data = await comment_issue(
             context.bot.session,
             repo,
             issue_id,
             comment_wrap(await process_attachments(context, attachment.url), context)
         )
         if status:
-            await context.send(f"Successfully added comment {link}")
+            await context.send(f"Successfully added comment {comment_data['html_url']}")
         else:
-            await context.send(f"Github error occurred: {link}")
+            await context.send(f"Github error occurred: {comment_data}")
 
     @staticmethod
     async def _comment_issue(context: Context, repo: str, args: List[str], args_len: int) -> None:
         issue_id = args[1] if args_len > 1 else await get_argument(context, "Waiting for issue id:")
         content = args[2] if args_len > 2 else await get_argument(context, "Waiting for comment text:")
-        status, link = await comment_issue(context.bot.session, repo, issue_id, comment_wrap(content, context))
+        status, comment_data = await comment_issue(context.bot.session, repo, issue_id, comment_wrap(content, context))
         if status:
-            await context.send(f"Successfully added comment {link}")
+            await context.send(f"Successfully added comment {comment_data['html_url']}")
         else:
-            await context.send(f"Github error occurred: {link}")
+            await context.send(f"Github error occurred: {comment_data}")
 
     @staticmethod
     async def _assign_to_issue(context: Context, repo: str, args: List[str], args_len: int) -> None:
