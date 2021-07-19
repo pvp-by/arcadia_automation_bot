@@ -35,6 +35,7 @@ class Github(commands.Cog, name="Github"):
         self.url_regex = re.compile(
             "(https?:\/\/(.+?\.)?github\.com\/arcadia-redux(\/[A-Za-z0-9\-\._~:\/\?#\[\]@!$&'\(\)\*\+,;\=]*)?)"
         )
+        self.numeric_regex = re.compile('[-+]?\d+')
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -76,6 +77,12 @@ class Github(commands.Cog, name="Github"):
         message_split = body.split(":")
         reply_command = message_split[0]
         args: List[str] = message_split[1].strip().split(" ") if len(message_split) > 1 else []
+
+        if "https://steamcommunity.com/profiles/" in replied_message.embeds[0].author.url:
+            if reply_command.lower() == "send":
+                await self._send_feedback_reply(message, issue_id, message_split[0:])
+            return
+
         callback = self.reply_processors.get(reply_command.lower(), None)
 
         if callback:
@@ -134,6 +141,66 @@ class Github(commands.Cog, name="Github"):
         logger.info(f"{milestones=}")
         status, _ = await set_issue_milestone(self.bot.session, repo, issue_id, " ".join(milestones).replace('"', ''))
         return status
+
+    async def _send_feedback_reply(self, message: Message, steam_id: str, text_content: list):
+        processed_text_content = ":".join(text_content).strip()
+        attachments = {}
+        # parse text content to find and process rewards line
+        if '\n' in processed_text_content:
+            # process attachments
+            content_lines = processed_text_content.split('\n')
+            resulting_text = []
+
+            for line in content_lines:
+                lower_line = line.lower()
+                if lower_line.startswith("reward:"):
+                    rewards_line = lower_line.replace("reward:", "")
+                    rewards = rewards_line.split(",")
+                    for reward in rewards:
+                        value = re.findall(self.numeric_regex, reward)
+                        if "glory" in reward and value:
+                            attachments["glory"] = int(value[0])
+                        if "fortune" in reward and value:
+                            attachments["fortune"] = int(value[0])
+                        if "item" in reward:
+                            if "items" not in attachments:
+                                attachments["items"] = []
+                            attachments["items"].append(reward.strip())
+                else:
+                    resulting_text.append(line)
+            processed_text_content = "\n".join(resulting_text)
+
+        mail_data = {
+            "targetSteamId": steam_id,
+            "textContent": processed_text_content,
+            "attachments": attachments
+        }
+        result = await self.bot.session.post(
+            "https://chc-2.dota2unofficial.com/api/lua/mail/feedback_reply",
+            json=mail_data
+        )
+        print(await result.json())
+        await message.add_reaction("✅" if result.status < 400 else "🚫")
+
+    @commands.command()
+    async def test_feedback_sending(self, context: Context, steam_id: str, text: str):
+        split = text.split(":")
+        await self._send_feedback_reply(context.message, steam_id, split)
+
+    @commands.command()
+    async def feedback(self, context: Context):
+        await context.send(f"""
+You can reply to feedback messages of bot in #chc_feedback channel to send ingame mails to players.
+Reply must start with `Send:`. It is possible to attach rewards to the message, adding reward line:
+`Reward: 65 glory, 5 fortune, item_mail_test_2`. Reward line must be on new line, rewards should be 
+separated by `,`; order of wording in each reward is irrelevant (i.e. both `65 glory` and `glory 65` are valid).
+Casing of starting keywords is also irrelevant.
+Full example:
+```
+send: glory to Arstotzka
+reward: -10000 glory, -1000 fortune, item_conscription_notification
+```
+        """.strip())
 
     async def process_github_links(self, message: Message):
         content = message.content
