@@ -80,7 +80,7 @@ class Github(commands.Cog, name="Github"):
 
         if "https://steamcommunity.com/profiles/" in replied_message.embeds[0].author.url:
             if reply_command.lower() == "send":
-                await self._send_feedback_reply(message, issue_id, message_split[0:])
+                await self._send_feedback_reply(message, replied_message, issue_id, message_split[1:])
             return
 
         callback = self.reply_processors.get(reply_command.lower(), None)
@@ -142,50 +142,55 @@ class Github(commands.Cog, name="Github"):
         status, _ = await set_issue_milestone(self.bot.session, repo, issue_id, " ".join(milestones).replace('"', ''))
         return status
 
-    async def _send_feedback_reply(self, message: Message, steam_id: str, text_content: list):
+    async def _send_feedback_reply(self, message: Message, replied_message: Message, steam_id: str, text_content: list):
+        feedback_text = replied_message.embeds[0].description.replace("```", "")
         processed_text_content = ":".join(text_content).strip()
         attachments = {}
         # parse text content to find and process rewards line
         if '\n' in processed_text_content:
             # process attachments
             content_lines = processed_text_content.split('\n')
-            resulting_text = []
+            resulting_text_lines = []
 
             for line in content_lines:
                 lower_line = line.lower()
-                if lower_line.startswith("reward:"):
-                    rewards_line = lower_line.replace("reward:", "")
-                    rewards = rewards_line.split(",")
-                    for reward in rewards:
-                        value = re.findall(self.numeric_regex, reward)
-                        if "glory" in reward and value:
-                            attachments["glory"] = int(value[0])
-                        if "fortune" in reward and value:
-                            attachments["fortune"] = int(value[0])
-                        if "item" in reward:
-                            if "items" not in attachments:
-                                attachments["items"] = []
-                            attachments["items"].append(reward.strip())
-                else:
-                    resulting_text.append(line)
-            processed_text_content = "\n".join(resulting_text)
+
+                if not lower_line.startswith("reward:"):
+                    resulting_text_lines.append(line)
+                    continue
+
+                rewards_line = lower_line.replace("reward:", "")
+                rewards = rewards_line.split(",")
+                for reward in rewards:
+                    value = re.findall(self.numeric_regex, reward)
+                    if "glory" in reward and value:
+                        attachments["glory"] = int(value[0])
+                    if "fortune" in reward and value:
+                        attachments["fortune"] = int(value[0])
+                    if "item" in reward:
+                        if "items" not in attachments:
+                            attachments["items"] = []
+                        attachments["items"].append(reward.strip())
+
+            processed_text_content = "\n".join(resulting_text_lines)
+
+        final_text_content = f"In response to your feedback message:\n>\t{feedback_text}\n\n{processed_text_content}"
 
         mail_data = {
             "targetSteamId": steam_id,
-            "textContent": processed_text_content,
+            "textContent": final_text_content,
             "attachments": attachments
         }
         result = await self.bot.session.post(
             "https://chc-2.dota2unofficial.com/api/lua/mail/feedback_reply",
             json=mail_data
         )
-        print(await result.json())
         await message.add_reaction("✅" if result.status < 400 else "🚫")
 
     @commands.command()
     async def test_feedback_sending(self, context: Context, steam_id: str, text: str):
         split = text.split(":")
-        await self._send_feedback_reply(context.message, steam_id, split)
+        await self._send_feedback_reply(context.message, context.message, steam_id, split)
 
     @commands.command()
     async def feedback(self, context: Context):
